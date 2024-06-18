@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin calendar</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            background-image: url("https://bitcoin.org/img/home/bitcoin-img.svg?1716491272");
+            background-size: cover;
+            background-position: center;
+        }
+
+        #dashboard {
+            background-color: white;
+            padding: 14px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 90%;
+            width: 470px;
+        }
+
+        #price {
+            font-size: 1.5em;
+            color: #333;
+            white-space: pre-wrap;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #222;
+        }
+
+        #qrcode {
+            display: none;
+        }
+
+        /* Media query for devices with a max width of 600px */
+        @media (max-width: 600px) {
+            #dashboard {
+                padding: 15px;
+            }
+
+            #price {
+                font-size: 1.2em;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+        }
+
+        /* Media query for devices with a max width of 400px */
+        @media (max-width: 400px) {
+            #dashboard {
+                padding: 10px;
+            }
+
+            #price {
+                font-size: 1em;
+            }
+
+            h1 {
+                font-size: 1.2em;
+            }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1c1c1e;
+                color: #fefefe;
+            }
+
+            a {
+                color: #5fa9ee;
+            }
+
+            img {
+                filter: grayscale(20%);
+            }
+
+
+        }
+    </style>
+    <link rel="manifest" href="/bitcoin/calendar.json">
+</head>
+
+<body>
+    <div id="dashboard">
+        <h1>
+            <div id="title">Calendrier Bitcoin</div>
+        </h1>
+        <div id="price">load</div>
+        <button id="share" type="button"> share... </button>
+        <button id="donate" type="button"> donate... </button>
+        <div id="qrcode"><img src="/bitcoin/qrcode.png"><br>
+            <a href="bitcoin:bc1qegafwn5xflxesxvke54x7e5k4ku8h724tkqhgf">bc1qegafwn5xflxesxvke54x7e5k4ku8h724tkqhgf</a>
+        </div>
+    </div>
+    <script>
+
+
+        document.getElementById('share').addEventListener('click', event => {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Bitcoin Calendar',
+                    url: 'https://onfray.info/bitcoin/calendar.html'
+                }).then(() => {
+                    //console.log('Thanks for sharing!');
+                })
+                //.catch(console.error);
+            }
+        });
+
+        let shortLang = navigator.languages && navigator.languages[0] || navigator.language || navigator.userLanguage;
+        if (shortLang.includes("fr")) shortLang = "fr";
+        else shortLang = "en";
+
+        function split75(str) {
+            return str.match(/.{1,75}/g).map(s => s + " \r\n ").join('');
+        }
+
+        function ajouterEventHalving(date, decal, summary, desc = '') {
+            const stampDate = new Date(date - (decal * 86400 * 1000)).toLocaleDateString(navigator.language, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+            });
+            return `${stampDate}\r\n${split75(`${summary}`)}${split75(`${desc}`)}\r\n`;
+        }
+
+        async function fetchBlockLeft() {
+            const intervalleBlocks = 210000;
+            const apiUrl = 'https://api.blockcypher.com/v1/btc/main';
+            const langA = Array;
+
+            try {
+                let response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`Error w URL: ${response.statusText}`);
+                }
+
+                let tabBtc = await response.json();
+
+                let numeroHalving = Math.ceil(tabBtc.height / intervalleBlocks);
+                let blocksLeft = (numeroHalving * intervalleBlocks) - tabBtc.height;
+                let minutesLeft = blocksLeft * 10;
+                let minutesLeftApprox = Math.ceil(minutesLeft * 98.13 / 100);
+                let nextHalvingApprox = Date.now() + (minutesLeftApprox * 60 * 1000);
+
+                langA["en"] = ["It's time to sell !", "It's time to buy !", `Estimated halving time: ${new Date(nextHalvingApprox).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} \r\nBlocks until halving #${numeroHalving}: ${blocksLeft}.`, '😍 Share', 'Bitcoin calendar', '❤️ Donate'];
+                langA["fr"] = ["C'est le moment de vendre !", "C'est le moment d'acheter !", `Le halving n°${numeroHalving} est prévu pour ${new Date(nextHalvingApprox).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} \r\nIl reste ${blocksLeft} blocs.`, '😍 Partager', 'Calendrier Bitcoin', '❤️ Donner'];
+                const lang = langA[shortLang];
+
+                let cal = ajouterEventHalving(nextHalvingApprox, 910, "📈 Bitcoin ATH 📈", lang[0]);
+                cal += ajouterEventHalving(nextHalvingApprox, 500, "📉 Bitcoin ATL 📉", lang[1]);
+                cal += ajouterEventHalving(nextHalvingApprox, 0, "🪙 Bitcoin Halving 🪙", lang[2]);
+
+                document.getElementById('price').innerText = cal;
+                document.getElementById('share').innerText = lang[3];
+                document.getElementById('title').innerText = lang[4];
+                document.getElementById('donate').innerText = lang[5];
+            } catch (error) {
+                document.getElementById('price').innerText = 'Error: ' + error.message;
+            }
+        }
+
+        fetchBlockLeft();
+        setInterval(fetchBlockLeft, 500000);
+
+        document.getElementById("donate").addEventListener("click", (event) => {
+            let qr = document.getElementById("qrcode");
+            if (qr.style.display != "block") qr.style.display = "block";
+            else qr.style.display = "none";
+        });
+    </script>
+</body>
+
+</html>
